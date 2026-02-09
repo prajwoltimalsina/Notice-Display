@@ -1,0 +1,320 @@
+# Role-Based Authentication System - Visual Architecture
+
+## Database Schema Changes
+
+```
+User Document
+├─ email .......................... String (unique)
+├─ password ....................... String (hashed)
+├─ name ........................... String
+├─ role ........................... String (enum: 'admin' | 'user')
+├─ isApproved .................... Boolean (NEW - controls access)
+├─ approvedAt .................... Date (NEW - audit trail)
+├─ approvedBy .................... ObjectId ref (NEW - who approved)
+└─ created_at .................... Date
+```
+
+## Authentication Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                       USER REGISTRATION                         │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                    ┌─────────┴─────────┐
+                    │                   │
+           Register as "user"    Register as "admin"
+                    │                   │
+                    ▼                   ▼
+            ┌───────────────┐  ┌──────────────────┐
+            │ isApproved =  │  │ isApproved =     │
+            │     true      │  │     false        │
+            │ (auto-approve)│  │ (need approval)  │
+            └───────┬───────┘  └────────┬─────────┘
+                    │                   │
+         ┌──────────▼────────┐  ┌──────▼──────────────────┐
+         │ Generate JWT      │  │ No token issued         │
+         │ Return token      │  │ Return pending message  │
+         │ to client         │  │ User cannot login yet   │
+         └──────┬────────────┘  └──────┬─────────────────┘
+                │                      │
+                └──────────┬───────────┘
+                           ▼
+                ┌──────────────────────┐
+                │  ADMIN APPROVES      │
+                │  /admin/:id/approve  │
+                └──────────┬───────────┘
+                           │
+                    ┌──────▼──────────┐
+                    │ Set isApproved  │
+                    │ = true          │
+                    │ Set approvedAt  │
+                    │ Set approvedBy  │
+                    └──────┬──────────┘
+                           │
+                           ▼
+                  ┌────────────────────┐
+                  │ User can now login │
+                  └────────────────────┘
+```
+
+## Login Flow Diagram
+
+```
+┌────────────────────────────────────────────┐
+│  USER SUBMITS LOGIN CREDENTIALS            │
+│  (email + password)                        │
+└────────────────┬─────────────────────────────┘
+                 │
+                 ▼
+        ┌─────────────────┐
+        │ Find user by    │
+        │ email in DB     │
+        └────────┬────────┘
+                 │
+        ┌────────┴────────┐
+        │                 │
+     NOT FOUND        FOUND
+        │                 │
+        ▼                 ▼
+    ┌──────┐      ┌──────────────┐
+    │ 401  │      │ Compare      │
+    │Error │      │ password     │
+    └──────┘      └────────┬─────┘
+                           │
+                  ┌────────┴────────┐
+                  │                 │
+               MATCH            NO MATCH
+                  │                 │
+                  ▼                 ▼
+         ┌─────────────────┐    ┌──────┐
+         │ Check if user   │    │ 401  │
+         │ isApproved      │    │Error │
+         └────────┬────────┘    └──────┘
+                  │
+         ┌────────┴────────┐
+         │                 │
+       true             false
+         │                 │
+         ▼                 ▼
+    ┌──────────┐   ┌────────────────────┐
+    │Generate  │   │ 403 Error:         │
+    │JWT Token │   │ "Admin access      │
+    │Return it │   │  pending approval" │
+    │Login     │   │ No token issued    │
+    │Success   │   └────────────────────┘
+    └──────────┘
+```
+
+## Request Flow for Protected Routes
+
+```
+┌────────────────────────────────────────────────┐
+│  ADMIN TRIES TO ACCESS PROTECTED ROUTE         │
+│  POST /api/notices/upload                      │
+│  Header: Authorization: Bearer <jwt_token>    │
+└────────────────┬─────────────────────────────────┘
+                 │
+                 ▼
+        ┌──────────────────┐
+        │ authMiddleware   │
+        │ Check token      │
+        │ exists & valid   │
+        └────────┬─────────┘
+                 │
+        ┌────────┴────────────┐
+        │                     │
+      VALID              INVALID/MISSING
+        │                     │
+        ▼                     ▼
+    ┌──────┐         ┌────────────────┐
+    │ Get  │         │ 401 Unauthorized
+    │user  │         │ No token       │
+    │from  │         └────────────────┘
+    │token │
+    └───┬──┘
+        │
+        ▼
+    ┌──────────────────────┐
+    │ adminMiddleware      │
+    │ Check user.role      │
+    │ == 'admin'           │
+    │ AND user.isApproved  │
+    │ == true              │
+    └────────┬─────────────┘
+             │
+    ┌────────┴────────────┐
+    │                     │
+  BOTH TRUE          ANY FALSE
+    │                     │
+    ▼                     ▼
+┌──────────┐     ┌────────────────────┐
+│ Allow    │     │ 403 Forbidden      │
+│ Route    │     │ "Access denied.    │
+│ Handler  │     │ Admin only."       │
+│ Execute  │     └────────────────────┘
+└──────────┘
+```
+
+## User Status Matrix
+
+```
+┌──────────────┬───────────┬──────────────┬──────────────────────┐
+│ Role         │ Approved  │ Can Login?   │ Admin Access?        │
+├──────────────┼───────────┼──────────────┼──────────────────────┤
+│ user         │ true      │ ✅ YES       │ ❌ NO                │
+│ admin        │ true      │ ✅ YES       │ ✅ YES               │
+│ admin        │ false     │ ❌ NO (403)  │ ❌ NO                │
+│ user         │ false     │ ❌ NO        │ ❌ NO                │
+│              │           │ (shouldn't   │ (shouldn't happen)   │
+│              │           │  happen)    │                      │
+└──────────────┴───────────┴──────────────┴──────────────────────┘
+```
+
+## Admin Approval Process Workflow
+
+```
+Step 1: New Admin Registers
+┌─────────────────────────────────┐
+│ POST /api/auth/register         │
+│ {                               │
+│   email: admin@example.com      │
+│   name: New Admin               │
+│   role: admin                   │
+│ }                               │
+└────────────┬────────────────────┘
+             │
+             ▼
+    Response: No token
+    pendingApproval: true
+             │
+             ▼
+Step 2: Existing Admin Checks Pending
+┌──────────────────────────────────┐
+│ GET /api/auth/admin/pending-app  │
+│ Headers: Bearer <admin_token>    │
+└────────────┬─────────────────────┘
+             │
+             ▼
+    Returns list of unapproved admins
+             │
+             ▼
+Step 3: Existing Admin Approves
+┌──────────────────────────────────┐
+│ PATCH /api/auth/admin/:id/approve│
+│ Headers: Bearer <admin_token>    │
+└────────────┬─────────────────────┘
+             │
+             ▼
+    User DB updated:
+    isApproved = true
+    approvedAt = now
+    approvedBy = existing_admin_id
+             │
+             ▼
+Step 4: New Admin Can Now Login
+┌──────────────────────────────────┐
+│ POST /api/auth/login             │
+│ {                                │
+│   email: admin@example.com       │
+│   password: ***                  │
+│ }                                │
+└────────────┬─────────────────────┘
+             │
+             ▼
+    Response: JWT token issued
+    Can access admin features
+```
+
+## Component Hierarchy (Frontend)
+
+```
+App
+├── MongoAuthProvider
+│   ├── useMongoAuth() context
+│   │   ├── user: MongoUser | null
+│   │   ├── isAdmin: boolean
+│   │   ├── isAdminApproved: boolean
+│   │   ├── loginError: string
+│   │   ├── signIn()
+│   │   ├── signUp()
+│   │   └── signOut()
+│   │
+│   └── Protected Components
+│       ├── Dashboard
+│       │   └── (shown when isAdmin = true)
+│       ├── AdminPanel
+│       │   └── (shown when isAdminApproved = true)
+│       └── Auth Page
+│           └── (shown when user = null)
+```
+
+## Token Payload Structure
+
+```
+┌─────────────────────────────────┐
+│ JWT Token Payload               │
+├─────────────────────────────────┤
+│ {                               │
+│   userId: "507f...",            │
+│   role: "admin" | "user",       │
+│   iat: 1707...,                 │
+│   exp: 1708... (7 days later)   │
+│ }                               │
+└─────────────────────────────────┘
+         │
+         Used by middleware to:
+         ├─ Verify user identity
+         ├─ Determine user role
+         ├─ Set req.user in server
+         └─ Require admin check
+```
+
+## Error Response Flow
+
+```
+Request Fails? → Why?
+        │
+        ├─────────────────────────────────────┐
+        │                                     │
+        ▼                                     ▼
+    Invalid Token              Missing/Invalid Credentials
+        │                            │
+        ▼                            ▼
+    401 Unauthorized            401 Unauthorized
+    "Token is invalid            "Invalid email or
+     or expired"                  password"
+        
+        
+User Doesn't Have Admin?
+        │
+        ├─────────────────────────────────────┐
+        │                                     │
+        ▼                                     ▼
+    role !== 'admin'        isApproved !== true
+        │                            │
+        ▼                            ▼
+    403 Forbidden            403 Forbidden
+    "Access denied.         "Admin access pending
+     Admin only."            approval. Please
+                             contact admin."
+```
+
+## Summary: The Three Keys to Access
+
+```
+For Admin-Protected Routes:
+
+    ✓ KEY 1: Authentication
+      └─ Valid JWT token
+      └─ User exists in DB
+    
+    ✓ KEY 2: Admin Role
+      └─ user.role === 'admin'
+    
+    ✓ KEY 3: Approval Status
+      └─ user.isApproved === true
+
+    ALL THREE REQUIRED → ACCESS GRANTED ✅
+    ANY ONE MISSING → 403 ERROR ❌
+```

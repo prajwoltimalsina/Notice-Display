@@ -143,29 +143,23 @@ export function NoticeSlideshow({
         key={notice._id}
         className="flex-1 flex flex-col min-w-0 bg-slate-900 rounded-lg overflow-hidden"
       >
-        {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-3 py-2 flex-shrink-0">
-          <h2 className="text-sm font-semibold truncate">{notice.title}</h2>
-          {notice.description && (
-            <p className="text-xs text-blue-100 truncate">
-              {notice.description}
-            </p>
-          )}
-        </div>
+        {/* Header - Hidden to maximize notice display area */}
 
         {/* Content */}
-        <div className="flex-1 relative overflow-hidden bg-slate-800">
+        <div className="flex-1 relative overflow-hidden">
           {isImage ? (
             <img
               src={mediaUrl}
               alt={notice.title}
-              className="w-full h-full object-contain"
+              className="w-full h-full"
+              style={{ objectFit: "fill" }}
             />
           ) : isVideo ? (
             <video
               src={mediaUrl}
               controls
-              className="w-full h-full object-contain"
+              className="w-full h-full"
+              style={{ objectFit: "fill" }}
             />
           ) : isPdf ? (
             <iframe
@@ -188,7 +182,7 @@ export function NoticeSlideshow({
   };
 
   return (
-    <div className="w-full h-full flex flex-col overflow-hidden rounded-lg bg-slate-900">
+    <div className="w-full h-full flex flex-col overflow-hidden">
       <div className="flex-1 relative overflow-hidden">
         <div
           className={`w-full h-full flex gap-3 p-3 transition-opacity duration-300 ${

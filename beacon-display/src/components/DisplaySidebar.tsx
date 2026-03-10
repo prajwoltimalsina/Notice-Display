@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
-import { AnalogClock } from './AnalogClock';
-import { MapPin, Droplets, Wind } from 'lucide-react';
-import { useWeather } from '@/hooks/useWeather';
+import { useState, useEffect } from "react";
+import { AnalogClock } from "./AnalogClock";
+import { MapPin, Droplets, Wind } from "lucide-react";
+import { useWeather } from "@/hooks/useWeather";
 
 export function DisplaySidebar() {
   const [time, setTime] = useState(new Date());
-  const { weather, isLoading: weatherLoading } = useWeather('Dhulikhel');
+  const { weather, isLoading: weatherLoading } = useWeather("Kathmandu");
 
   useEffect(() => {
     const interval = setInterval(() => setTime(new Date()), 1000);
@@ -13,28 +13,28 @@ export function DisplaySidebar() {
   }, []);
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
       hour12: true,
     });
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      day: '2-digit',
-      month: 'short',
-      weekday: 'short',
+    return date.toLocaleDateString("en-US", {
+      day: "2-digit",
+      month: "short",
+      weekday: "short",
     });
   };
 
   const formatFullDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   };
 
@@ -51,7 +51,7 @@ export function DisplaySidebar() {
       <div className="bg-blue-900/50 px-4 py-3 border-t border-blue-500/30">
         <div className="flex items-center gap-2 text-blue-100 mb-2">
           <MapPin className="w-4 h-4" />
-          <span className="font-medium">Dhulikhel</span>
+          <span className="font-medium">Kathmandu University</span>
         </div>
         {!weatherLoading && weather && (
           <div className="space-y-2">
@@ -59,7 +59,9 @@ export function DisplaySidebar() {
               <span className="text-3xl">{weather.icon}</span>
               <span className="text-2xl font-bold">{weather.temp}°C</span>
             </div>
-            <p className="text-sm text-blue-200 capitalize">{weather.description}</p>
+            <p className="text-sm text-blue-200 capitalize">
+              {weather.description}
+            </p>
             {weather.humidity && weather.windSpeed && (
               <div className="flex items-center gap-4 text-xs text-blue-300">
                 <div className="flex items-center gap-1">
@@ -84,7 +86,9 @@ export function DisplaySidebar() {
       {/* Digital Time */}
       <div className="bg-blue-950 px-4 py-4 text-center">
         <p className="text-3xl font-bold tracking-wide">{formatTime(time)}</p>
-        <p className="text-xs text-blue-300 mt-1 truncate">{formatFullDate(time)}</p>
+        <p className="text-xs text-blue-300 mt-1 truncate">
+          {formatFullDate(time)}
+        </p>
       </div>
     </div>
   );

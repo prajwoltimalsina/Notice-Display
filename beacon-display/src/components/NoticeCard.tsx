@@ -1,7 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
-import { Notice } from '@/types/database';
-import { FileText, GripVertical, Maximize2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useState, useRef, useEffect } from "react";
+import { Notice } from "@/types/database";
+import { FileText, GripVertical, Maximize2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface NoticeCardProps {
   notice: Notice;
@@ -10,16 +10,22 @@ interface NoticeCardProps {
   isEditable?: boolean;
 }
 
-export function NoticeCard({ 
-  notice, 
-  onPositionChange, 
+export function NoticeCard({
+  notice,
+  onPositionChange,
   onSizeChange,
-  isEditable = false 
+  isEditable = false,
 }: NoticeCardProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
-  const [position, setPosition] = useState({ x: notice.position_x, y: notice.position_y });
-  const [size, setSize] = useState({ width: notice.width, height: notice.height });
+  const [position, setPosition] = useState({
+    x: notice.position_x,
+    y: notice.position_y,
+  });
+  const [size, setSize] = useState({
+    width: notice.width,
+    height: notice.height,
+  });
   const cardRef = useRef<HTMLDivElement>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const resizeStart = useRef({ width: 0, height: 0, x: 0, y: 0 });
@@ -37,7 +43,7 @@ export function NoticeCard({
     if (rect) {
       dragOffset.current = {
         x: e.clientX - rect.left,
-        y: e.clientY - rect.top
+        y: e.clientY - rect.top,
       };
     }
   };
@@ -51,7 +57,7 @@ export function NoticeCard({
       width: size.width,
       height: size.height,
       x: e.clientX,
-      y: e.clientY
+      y: e.clientY,
     };
   };
 
@@ -61,20 +67,23 @@ export function NoticeCard({
         const parent = cardRef.current.parentElement.getBoundingClientRect();
         const newX = e.clientX - parent.left - dragOffset.current.x;
         const newY = e.clientY - parent.top - dragOffset.current.y;
-        
+
         const clampedX = Math.max(0, Math.min(newX, parent.width - size.width));
-        const clampedY = Math.max(0, Math.min(newY, parent.height - size.height));
-        
+        const clampedY = Math.max(
+          0,
+          Math.min(newY, parent.height - size.height),
+        );
+
         setPosition({ x: clampedX, y: clampedY });
       }
-      
+
       if (isResizing) {
         const deltaX = e.clientX - resizeStart.current.x;
         const deltaY = e.clientY - resizeStart.current.y;
-        
+
         setSize({
           width: Math.max(150, resizeStart.current.width + deltaX),
-          height: Math.max(100, resizeStart.current.height + deltaY)
+          height: Math.max(100, resizeStart.current.height + deltaY),
         });
       }
     };
@@ -91,37 +100,45 @@ export function NoticeCard({
     };
 
     if (isDragging || isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
     }
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
     };
-  }, [isDragging, isResizing, position, size, notice._id, onPositionChange, onSizeChange]);
+  }, [
+    isDragging,
+    isResizing,
+    position,
+    size,
+    notice._id,
+    onPositionChange,
+    onSizeChange,
+  ]);
 
-  const isPDF = notice.file_type === 'application/pdf';
+  const isPDF = notice.file_type === "application/pdf";
 
   return (
     <div
       ref={cardRef}
       className={cn(
-        'notice-card glass-panel overflow-hidden',
-        isDragging && 'dragging',
-        isEditable && 'cursor-move'
+        "notice-card glass-panel overflow-hidden",
+        isDragging && "dragging",
+        isEditable && "cursor-move",
       )}
       style={{
         left: position.x,
         top: position.y,
         width: size.width,
         height: size.height,
-        zIndex: notice.z_index
+        zIndex: notice.z_index,
       }}
     >
       {/* Drag Handle */}
       {isEditable && (
-        <div 
+        <div
           className="absolute top-2 left-2 p-1 bg-secondary/80 rounded cursor-grab active:cursor-grabbing z-10"
           onMouseDown={handleMouseDown}
         >
@@ -134,10 +151,12 @@ export function NoticeCard({
         {isPDF ? (
           <div className="w-full h-full flex flex-col items-center justify-center bg-secondary/50 p-4">
             <FileText className="w-12 h-12 text-primary mb-2" />
-            <span className="text-sm text-center font-medium">{notice.title}</span>
-            <a 
-              href={notice.fileUrl} 
-              target="_blank" 
+            <span className="text-sm text-center font-medium">
+              {notice.title}
+            </span>
+            <a
+              href={notice.fileUrl}
+              target="_blank"
               rel="noopener noreferrer"
               className="text-xs text-primary hover:underline mt-2"
             >
@@ -148,16 +167,14 @@ export function NoticeCard({
           <img
             src={notice.fileUrl}
             alt={notice.title}
-            className="w-full h-full object-cover"
+            className="w-full h-full"
+            style={{ objectFit: "fill" }}
             draggable={false}
           />
         )}
       </div>
 
-      {/* Title Overlay */}
-      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-background/90 to-transparent p-3">
-        <h3 className="text-sm font-medium truncate">{notice.title}</h3>
-      </div>
+      {/* Title Overlay - Hidden */}
 
       {/* Resize Handle */}
       {isEditable && (

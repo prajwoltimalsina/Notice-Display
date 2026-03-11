@@ -24,7 +24,7 @@ export default function Display() {
 
   const footerMessage = getSetting(
     "footer_message",
-    "Welcome to Kathmandu University | School of Engineering | Excellence Through Knowledge",
+    "Welcome to Kathmandu University | School of Engineering | Excellence Through Knowledge | Bakhundol, Dhulikhel",
   );
 
   return (

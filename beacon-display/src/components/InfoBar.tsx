@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useWeather } from '@/hooks/useWeather';
-import { Clock, Cloud, MapPin } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useWeather } from "@/hooks/useWeather";
+import { Clock, Cloud, MapPin } from "lucide-react";
 
 export function InfoBar() {
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -14,20 +14,20 @@ export function InfoBar() {
   }, []);
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   };
 
   const formatTime = (date: Date) => {
-    return date.toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true,
     });
   };
 
@@ -39,9 +39,7 @@ export function InfoBar() {
           <Clock className="w-5 h-5 text-primary" />
           <span className="font-mono text-lg">{formatTime(currentTime)}</span>
         </div>
-        <div className="text-muted-foreground">
-          {formatDate(currentTime)}
-        </div>
+        <div className="text-muted-foreground">{formatDate(currentTime)}</div>
       </div>
 
       {/* Welcome Message */}

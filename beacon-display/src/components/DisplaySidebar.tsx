@@ -39,7 +39,7 @@ export function DisplaySidebar() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-b from-blue-600 to-blue-800 text-white">
+    <div className="h-full w-45 flex flex-col bg-gradient-to-b from-blue-600 to-blue-800 text-white">
       {/* Analog Clock Section */}
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-[180px]">

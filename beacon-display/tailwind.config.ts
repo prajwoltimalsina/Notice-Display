@@ -108,6 +108,10 @@ export default {
           "0%": { transform: "translateX(100%)" },
           "100%": { transform: "translateX(-100%)" },
         },
+        "marquee-slow": {
+          "0%": { transform: "translateX(100%)" },
+          "100%": { transform: "translateX(-100%)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -117,6 +121,7 @@ export default {
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
         float: "float 3s ease-in-out infinite",
         marquee: "marquee 17s linear infinite",
+        "marquee-slow": "marquee-slow 28s linear infinite",
       },
       backgroundImage: {
         "gradient-radial": "radial-gradient(var(--tw-gradient-stops))",
@@ -124,5 +129,5 @@ export default {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  // plugins: [require("tailwindcss-animate")],
 } satisfies Config;

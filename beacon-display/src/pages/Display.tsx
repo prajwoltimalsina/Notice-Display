@@ -115,7 +115,7 @@ export default function Display() {
 
   const footerMessage = getSetting(
     "footer_message",
-    "Welcome to Kathmandu University | School of Engineering | Excellence Through Knowledge | Bakhundol, Dhulikhel",
+    "Welcome to Kathmandu University | School of Engineering | Excellence Through Knowledge | Bakhundol, Dhulikhel, Kavre, Nepal | +977 11 415100, 415200 | soe_office@ku.edu.np | https://soe.ku.edu.np",
   );
 
   return (
@@ -158,7 +158,7 @@ export default function Display() {
       </div>
 
       {/* Animated Footer */}
-      <div className="flex-shrink-0">
+      <div className="flex-shrink-0 text-sm py-1">
         <MarqueeFooter message={footerMessage} />
       </div>
     </div>

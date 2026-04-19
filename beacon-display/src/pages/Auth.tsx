@@ -4,6 +4,8 @@ import { useMongoAuth } from "@/hooks/useMongoAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import ForgotPassword from "@/components/ForgotPassword";
+import ResetPasswordCode from "@/components/ResetPasswordCode";
 import { Monitor, Loader2, Mail, Lock, User } from "lucide-react";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -18,7 +20,9 @@ const signUpSchema = signInSchema.extend({
 });
 
 export default function Auth() {
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [view, setView] = useState<"signin" | "signup" | "forgot" | "reset">(
+    "signin",
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
@@ -26,6 +30,7 @@ export default function Auth() {
     fullName: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [resetEmail, setResetEmail] = useState("");
 
   const { signIn, signUp, user } = useMongoAuth();
   const navigate = useNavigate();
@@ -38,9 +43,9 @@ export default function Auth() {
 
   const validateForm = () => {
     try {
-      if (isSignUp) {
+      if (view === "signup") {
         signUpSchema.parse(formData);
-      } else {
+      } else if (view === "signin") {
         signInSchema.parse(formData);
       }
       setErrors({});
@@ -67,7 +72,7 @@ export default function Auth() {
     setIsLoading(true);
 
     try {
-      if (isSignUp) {
+      if (view === "signup") {
         const { error } = await signUp(
           formData.email,
           formData.password,
@@ -104,6 +109,52 @@ export default function Auth() {
     }
   };
 
+  const handleForgotPasswordSuccess = (email: string) => {
+    setResetEmail(email);
+    setView("reset"); // Move to reset password view
+  };
+
+  const handleResetPasswordSuccess = () => {
+    setView("signin");
+    setFormData({ email: resetEmail, password: "", fullName: "" });
+    setResetEmail("");
+  };
+
+  // Show forgot password view
+  if (view === "forgot") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-gradient-radial from-primary/10 via-transparent to-transparent pointer-events-none" />
+        <ForgotPassword
+          onBack={() => {
+            setView("signin");
+            setFormData({ email: "", password: "", fullName: "" });
+            setErrors({});
+          }}
+          onSuccess={handleForgotPasswordSuccess}
+        />
+      </div>
+    );
+  }
+
+  // Show reset password view (after entering email)
+  if (view === "reset" && resetEmail) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-gradient-radial from-primary/10 via-transparent to-transparent pointer-events-none" />
+        <ResetPasswordCode
+          email={resetEmail}
+          onBack={() => {
+            setView("signin");
+            setResetEmail("");
+          }}
+          onSuccess={handleResetPasswordSuccess}
+        />
+      </div>
+    );
+  }
+
+  // Show sign in / sign up view
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
       {/* Background effects */}
@@ -118,12 +169,12 @@ export default function Auth() {
             </div>
             <h1 className="text-2xl font-bold">KU Notice Board</h1>
             <p className="text-muted-foreground mt-1">
-              {isSignUp ? "Create admin account" : "Admin sign in"}
+              {view === "signup" ? "Create admin account" : "Admin sign in"}
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {isSignUp && (
+            {view === "signup" && (
               <div className="space-y-2">
                 <Label htmlFor="fullName">Full Name</Label>
                 <div className="relative">
@@ -184,6 +235,18 @@ export default function Auth() {
               )}
             </div>
 
+            {view === "signin" && (
+              <div className="text-right">
+                <button
+                  type="button"
+                  onClick={() => setView("forgot")}
+                  className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </div>
+            )}
+
             <Button
               type="submit"
               variant="glow"
@@ -193,9 +256,9 @@ export default function Auth() {
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  {isSignUp ? "Creating account..." : "Signing in..."}
+                  {view === "signup" ? "Creating account..." : "Signing in..."}
                 </>
-              ) : isSignUp ? (
+              ) : view === "signup" ? (
                 "Create Admin Account"
               ) : (
                 "Sign In"
@@ -207,12 +270,12 @@ export default function Auth() {
             <button
               type="button"
               onClick={() => {
-                setIsSignUp(!isSignUp);
+                setView(view === "signup" ? "signin" : "signup");
                 setErrors({});
               }}
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              {isSignUp ? (
+              {view === "signup" ? (
                 <>
                   Already have an account?{" "}
                   <span className="text-primary">Sign in</span>

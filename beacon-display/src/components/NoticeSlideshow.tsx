@@ -1,518 +1,3 @@
-// import { useState, useEffect, useCallback } from "react";
-// import { Notice } from "@/types/database";
-// import { FileText, ChevronLeft, ChevronRight } from "lucide-react";
-// import { Button } from "./ui/button";
-// import { saveNotices, getNotices, getMedia } from "@/utils/db";
-
-// interface NoticeSlideshowProps {
-//   notices: Notice[];
-//   intervalMs?: number; // Auto-advance interval in ms
-// }
-
-// export function NoticeSlideshow({
-//   notices,
-//   intervalMs = 10000,
-// }: NoticeSlideshowProps) {
-//   const [offlineNotices, setOfflineNotices] = useState<Notice[]>(notices);
-//   const [mediaMap, setMediaMap] = useState<Record<string, string>>({});
-//   const [currentPage, setCurrentPage] = useState(0);
-//   const [isTransitioning, setIsTransitioning] = useState(false);
-//   const noticesPerPage = 2;
-
-//   // Update offline notices when prop changes
-//   useEffect(() => {
-//     setOfflineNotices(notices);
-//   }, [notices]);
-
-//   // Load notices with online → offline fallback
-//   useEffect(() => {
-//     async function loadNotices() {
-//       const noticeList = notices.length > 0 ? notices : await getNotices();
-//       if (noticeList.length > 0) {
-//         setOfflineNotices(noticeList);
-
-//         // preload media
-//         const map: Record<string, string> = {};
-//         await Promise.all(
-//           noticeList.map(async (n) => {
-//             if (n.fileUrl) map[n._id] = await getMedia(n.fileUrl);
-//           }),
-//         );
-//         setMediaMap(map);
-//       }
-
-//       // If offline, STOP here
-//       if (!navigator.onLine) return;
-
-//       // Fetch fresh data online if not already provided
-//       if (notices.length === 0) {
-//         try {
-//           const res = await fetch(
-//             "http://localhost:5000/api/notices/published",
-//           );
-//           const data = await res.json();
-
-//           await saveNotices(data);
-//           setOfflineNotices(data);
-
-//           const map: Record<string, string> = {};
-//           await Promise.all(
-//             data.map(async (n: Notice) => {
-//               if (n.fileUrl) map[n._id] = await getMedia(n.fileUrl);
-//             }),
-//           );
-//           setMediaMap(map);
-//         } catch {
-//           // silent fail — cached data already shown
-//         }
-//       }
-//     }
-
-//     loadNotices();
-
-//     const handleOnline = () => loadNotices();
-//     window.addEventListener("online", handleOnline);
-//     return () => window.removeEventListener("online", handleOnline);
-//   }, [notices]);
-
-//   const publishedNotices = offlineNotices.filter((n) => n.is_published);
-//   const totalPages = Math.ceil(publishedNotices.length / noticesPerPage);
-
-//   const goToNext = useCallback(() => {
-//     if (totalPages <= 1) return;
-//     setIsTransitioning(true);
-//     setTimeout(() => {
-//       setCurrentPage((prev) => (prev + 1) % totalPages);
-//       setIsTransitioning(false);
-//     }, 300);
-//   }, [totalPages]);
-
-//   const goToPrevious = useCallback(() => {
-//     if (totalPages <= 1) return;
-//     setIsTransitioning(true);
-//     setTimeout(() => {
-//       setCurrentPage((prev) => (prev === 0 ? totalPages - 1 : prev - 1));
-//       setIsTransitioning(false);
-//     }, 300);
-//   }, [totalPages]);
-
-//   // Auto-advance
-//   useEffect(() => {
-//     if (totalPages <= 1) return;
-//     const interval = setInterval(goToNext, intervalMs);
-//     return () => clearInterval(interval);
-//   }, [totalPages, intervalMs, goToNext]);
-
-//   // Reset page if notices change
-//   useEffect(() => {
-//     if (currentPage >= totalPages && totalPages > 0) setCurrentPage(0);
-//   }, [totalPages, currentPage]);
-
-//   if (publishedNotices.length === 0) {
-//     return (
-//       <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-lg">
-//         <div className="text-center p-8">
-//           <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-blue-900/50 flex items-center justify-center">
-//             <span className="text-3xl">📋</span>
-//           </div>
-//           <h3 className="text-xl font-medium text-slate-300">
-//             No notices to display
-//           </h3>
-//           <p className="text-sm text-slate-500 mt-2">
-//             Notices will appear here when published
-//           </p>
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   const startIndex = currentPage * noticesPerPage;
-//   const currentNotices = publishedNotices.slice(
-//     startIndex,
-//     startIndex + noticesPerPage,
-//   );
-
-//   const renderNotice = (notice: Notice) => {
-//     const mediaUrl = mediaMap[notice._id] || notice.fileUrl;
-//     const isImage = notice?.file_type?.startsWith("image/");
-//     const isPdf = notice?.file_type === "application/pdf";
-//     const isVideo = notice?.file_type?.startsWith("video/");
-
-//     return (
-//       <div
-//         key={notice._id}
-//         className="flex-1 flex flex-col min-w-0 bg-slate-900 rounded-lg overflow-hidden"
-//       >
-//         {/* Header - Hidden to maximize notice display area */}
-
-//         {/* Content */}
-//         <div className="flex-1 relative overflow-hidden">
-//           {isImage ? (
-//             <img
-//               src={mediaUrl}
-//               alt={notice.title}
-//               className="w-full h-full"
-//               style={{ objectFit: "fill" }}
-//             />
-//           ) : isVideo ? (
-//             <video
-//               src={mediaUrl}
-//               controls
-//               className="w-full h-full"
-//               style={{ objectFit: "fill" }}
-//             />
-//           ) : isPdf ? (
-//             <iframe
-//               src={`${mediaUrl}#toolbar=0&navpanes=0&view=FitH`}
-//               sandbox=""
-//               className="w-full h-full border-0"
-//               title={notice.title}
-//             />
-//           ) : (
-//             <div className="flex flex-col items-center justify-center h-full">
-//               <FileText className="w-12 h-12 text-blue-400 mb-2" />
-//               <h3 className="text-lg font-semibold text-slate-200">
-//                 {notice.title}
-//               </h3>
-//             </div>
-//           )}
-//         </div>
-//       </div>
-//     );
-//   };
-
-//   return (
-//     <div className="w-full h-full flex flex-col overflow-hidden">
-//       <div className="flex-1 relative overflow-hidden">
-//         <div
-//           className={`w-full h-full flex gap-3 p-3 transition-opacity duration-300 ${
-//             isTransitioning ? "opacity-0" : "opacity-100"
-//           }`}
-//         >
-//           {currentNotices.map(renderNotice)}
-//           {currentNotices.length === 1 && (
-//             <div className="flex-1 flex items-center justify-center bg-slate-800 rounded-lg">
-//               <p className="text-slate-500 text-sm">End of notices</p>
-//             </div>
-//           )}
-//         </div>
-
-//         {/* Navigation Arrows
-//         {totalPages > 2 && (
-//           <>
-//             <Button
-//               variant="ghost"
-//               size="icon"
-//               className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/40 hover:bg-black/60 text-white shadow-lg z-10"
-//               onClick={goToPrevious}
-//             >
-//               <ChevronLeft className="w-6 h-6" />
-//             </Button>
-//             <Button
-//               // variant="ghost"
-//               // size="icon"
-//               className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-black/40 hover:bg-black/60 text-white shadow-lg z-10"
-//               onClick={goToNext}
-//             >
-//               <ChevronRight className="w-6 h-6" />
-//             </Button>
-//           </>
-//         )} */}
-//       </div>
-
-//       {/* Page Indicators */}
-//       {totalPages > 1 && (
-//         <div className="bg-slate-800 px-4 py-2 flex items-center justify-center gap-2 flex-shrink-0">
-//           <span className="text-xs text-slate-400 mr-2">
-//             {currentPage + 1}/{totalPages}
-//           </span>
-//           {Array.from({ length: totalPages }).map((_, index) => (
-//             <button
-//               key={index}
-//               onClick={() => {
-//                 setIsTransitioning(true);
-//                 setTimeout(() => {
-//                   setCurrentPage(index);
-//                   setIsTransitioning(false);
-//                 }, 300);
-//               }}
-//               className={`w-2 h-2 rounded-full transition-all ${
-//                 index === currentPage
-//                   ? "bg-blue-500 w-6"
-//                   : "bg-slate-600 hover:bg-slate-500"
-//               }`}
-//             />
-//           ))}
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
-// import { useState, useEffect, useCallback } from "react";
-// import { Notice } from "@/types/database";
-// import { FileText, ChevronLeft, ChevronRight } from "lucide-react";
-// import { Button } from "./ui/button";
-// import { saveNotices, getNotices, getMedia } from "@/utils/db";
-
-// interface NoticeSlideshowProps {
-//   notices: Notice[];
-//   intervalMs?: number;
-// }
-
-// export function NoticeSlideshow({
-//   notices,
-//   intervalMs = 10000,
-// }: NoticeSlideshowProps) {
-//   const [offlineNotices, setOfflineNotices] = useState<Notice[]>(notices);
-//   const [mediaMap, setMediaMap] = useState<Record<string, string>>({});
-//   const [currentIndex, setCurrentIndex] = useState(0);
-//   const [isTransitioning, setIsTransitioning] = useState(false);
-
-//   const noticesPerView = 2;
-
-//   // Sync notices from props
-//   useEffect(() => {
-//     setOfflineNotices(notices);
-//   }, [notices]);
-
-//   // Load notices with offline support
-//   useEffect(() => {
-//     async function loadNotices() {
-//       const noticeList = notices.length > 0 ? notices : await getNotices();
-
-//       if (noticeList.length > 0) {
-//         setOfflineNotices(noticeList);
-
-//         const map: Record<string, string> = {};
-
-//         await Promise.all(
-//           noticeList.map(async (n) => {
-//             if (n.fileUrl) map[n._id] = await getMedia(n.fileUrl);
-//           }),
-//         );
-
-//         setMediaMap(map);
-//       }
-
-//       if (!navigator.onLine) return;
-
-//       if (notices.length === 0) {
-//         try {
-//           const res = await fetch(
-//             "http://localhost:5000/api/notices/published",
-//           );
-
-//           const data = await res.json();
-
-//           await saveNotices(data);
-//           setOfflineNotices(data);
-
-//           const map: Record<string, string> = {};
-
-//           await Promise.all(
-//             data.map(async (n: Notice) => {
-//               if (n.fileUrl) map[n._id] = await getMedia(n.fileUrl);
-//             }),
-//           );
-
-//           setMediaMap(map);
-//         } catch {
-//           // silent fail
-//         }
-//       }
-//     }
-
-//     loadNotices();
-
-//     const handleOnline = () => loadNotices();
-
-//     window.addEventListener("online", handleOnline);
-
-//     return () => window.removeEventListener("online", handleOnline);
-//   }, [notices]);
-
-//   const publishedNotices = offlineNotices.filter((n) => n.is_published);
-
-//   // Slide navigation
-//   const goToNext = useCallback(() => {
-//     if (publishedNotices.length <= noticesPerView) return;
-
-//     setIsTransitioning(true);
-
-//     setTimeout(() => {
-//       setCurrentIndex((prev) =>
-//         prev + 1 >= publishedNotices.length ? 0 : prev + 1,
-//       );
-
-//       setIsTransitioning(false);
-//     }, 300);
-//   }, [publishedNotices.length]);
-
-//   const goToPrevious = useCallback(() => {
-//     if (publishedNotices.length <= noticesPerView) return;
-
-//     setIsTransitioning(true);
-
-//     setTimeout(() => {
-//       setCurrentIndex((prev) =>
-//         prev === 0 ? publishedNotices.length - 1 : prev - 1,
-//       );
-
-//       setIsTransitioning(false);
-//     }, 300);
-//   }, [publishedNotices.length]);
-
-//   // Auto advance
-//   useEffect(() => {
-//     if (publishedNotices.length <= noticesPerView) return;
-
-//     const interval = setInterval(goToNext, intervalMs);
-
-//     return () => clearInterval(interval);
-//   }, [publishedNotices.length, intervalMs, goToNext]);
-
-//   // Reset index if needed
-//   useEffect(() => {
-//     if (currentIndex >= publishedNotices.length) setCurrentIndex(0);
-//   }, [publishedNotices.length, currentIndex]);
-
-//   if (publishedNotices.length === 0) {
-//     return (
-//       <div className="w-full h-full flex items-center justify-center bg-slate-900 rounded-lg">
-//         <div className="text-center p-8">
-//           <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-blue-900/50 flex items-center justify-center">
-//             <span className="text-3xl">📋</span>
-//           </div>
-
-//           <h3 className="text-xl font-medium text-slate-300">
-//             No notices to display
-//           </h3>
-
-//           <p className="text-sm text-slate-500 mt-2">
-//             Notices will appear here when published
-//           </p>
-//         </div>
-//       </div>
-//     );
-//   }
-
-//   const currentNotices =
-//     publishedNotices.length >= 2
-//       ? [
-//           publishedNotices[currentIndex],
-//           publishedNotices[(currentIndex + 1) % publishedNotices.length],
-//         ]
-//       : [publishedNotices[currentIndex]];
-
-//   const renderNotice = (notice: Notice) => {
-//     const mediaUrl = mediaMap[notice._id] || notice.fileUrl;
-
-//     const isImage = notice?.file_type?.startsWith("image/");
-//     const isPdf = notice?.file_type === "application/pdf";
-//     const isVideo = notice?.file_type?.startsWith("video/");
-
-//     return (
-//       <div
-//         key={notice._id}
-//         className="flex-[1.2] flex flex-col min-w-0 bg-slate-900/95 border border-slate-700 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300"
-//       >
-//         <div className="flex-1 relative overflow-hidden p-1">
-//           {isImage ? (
-//             <img
-//               src={mediaUrl}
-//               alt={notice.title}
-//               className="w-full h-full object-fill rounded-lg"
-//               // style={{ objectFit: "contain" }}
-//             />
-//           ) : isVideo ? (
-//             <video
-//               src={mediaUrl}
-//               controls
-//               className="w-full h-full rounded-lg"
-//               style={{ objectFit: "fill" }}
-//             />
-//           ) : isPdf ? (
-//             <iframe
-//               src={`${mediaUrl}#toolbar=0&navpanes=0&view=FitH`}
-//               sandbox=""
-//               className="w-full h-full border-0 rounded-lg"
-//               title={notice.title}
-//             />
-//           ) : (
-//             <div className="flex flex-col items-center justify-center h-full">
-//               <FileText className="w-12 h-12 text-blue-400 mb-2" />
-//               <h3 className="text-lg font-semibold text-slate-200">
-//                 {notice.title}
-//               </h3>
-//             </div>
-//           )}
-//         </div>
-//       </div>
-//     );
-//   };
-
-//   return (
-//     <div className="w-full h-full flex flex-col overflow-hidden">
-//       <div className="flex-1 relative overflow-hidden">
-//         <div
-//           className={`w-full h-[calc(100%+25px)] flex gap-1 p-1 transition-opacity duration-300 ${
-//             isTransitioning ? "opacity-0" : "opacity-100"
-//           }`}
-//         >
-//           {currentNotices.map(renderNotice)}
-
-//           {currentNotices.length === 1 && (
-//             <div className="flex-1 flex items-center justify-center bg-slate-800 rounded-lg">
-//               <p className="text-slate-500 text-sm">End of notices</p>
-//             </div>
-//           )}
-//         </div>
-
-//         {/* {publishedNotices.length > noticesPerView && (
-//           <>
-//             <Button
-//               variant="ghost"
-//               size="icon"
-//               className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 hover:bg-black/60 text-white shadow-md z-10"
-//               onClick={goToPrevious}
-//             >
-//               <ChevronLeft className="w-4 h-4" />
-//             </Button>
-
-//             <Button
-//               variant="ghost"
-//               size="icon"
-//               className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-black/40 hover:bg-black/60 text-white shadow-md z-10"
-//               onClick={goToNext}
-//             >
-//               <ChevronRight className="w-4 h-4" />
-//             </Button>
-//           </>
-//         )} */}
-//       </div>
-
-//       {publishedNotices.length > noticesPerView && (
-//         <div className="bg-slate-800 px-4 py-2 flex items-center justify-center gap-2 flex-shrink-0">
-//           {Array.from({ length: publishedNotices.length - 1 }).map(
-//             (_, index) => (
-//               <button
-//                 key={index}
-//                 onClick={() => setCurrentIndex(index)}
-//                 className={`w-2 h-2 rounded-full transition-all ${
-//                   index === currentIndex
-//                     ? "bg-blue-500 w-6"
-//                     : "bg-slate-600 hover:bg-slate-500"
-//                 }`}
-//               />
-//             ),
-//           )}
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Notice } from "@/types/database";
 import { FileText } from "lucide-react";
@@ -532,7 +17,7 @@ export function NoticeSlideshow({
   const [offlineNotices, setOfflineNotices] = useState<Notice[]>(notices);
   const [mediaMap, setMediaMap] = useState<Record<string, string>>({});
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  // const [isTransitioning, setIsTransitioning] = useState(false);
   const lastFetchedIdsRef = useRef<string>("");
 
   const noticesPerView = 2;
@@ -615,30 +100,24 @@ export function NoticeSlideshow({
 
   const publishedNotices = offlineNotices.filter((n) => n.is_published);
 
+  // Create infinite circular loop by duplicating first notices at the end
+  const circularNotices =
+    publishedNotices.length >= 2
+      ? [...publishedNotices, publishedNotices[0], publishedNotices[1]]
+      : publishedNotices;
+
   const goToNext = useCallback(() => {
-    if (publishedNotices.length <= noticesPerView) return;
-    setIsTransitioning(true);
-    setTimeout(() => {
-      setCurrentIndex((prev) =>
-        prev + 1 >= publishedNotices.length ? 0 : prev + 1,
-      );
-      setIsTransitioning(false);
-    }, 300);
+    setCurrentIndex((prev) => (prev + 1) % publishedNotices.length);
   }, [publishedNotices.length]);
 
   const goToPrevious = useCallback(() => {
-    if (publishedNotices.length <= noticesPerView) return;
-    setIsTransitioning(true);
-    setTimeout(() => {
-      setCurrentIndex((prev) =>
-        prev === 0 ? publishedNotices.length - 1 : prev - 1,
-      );
-      setIsTransitioning(false);
-    }, 300);
+    setCurrentIndex((prev) =>
+      prev === 0 ? publishedNotices.length - 1 : prev - 1,
+    );
   }, [publishedNotices.length]);
 
   useEffect(() => {
-    if (publishedNotices.length <= noticesPerView) return;
+    if (publishedNotices.length === 0) return;
     const interval = setInterval(goToNext, intervalMs);
     return () => clearInterval(interval);
   }, [publishedNotices.length, intervalMs, goToNext]);
@@ -665,15 +144,7 @@ export function NoticeSlideshow({
     );
   }
 
-  const currentNotices =
-    publishedNotices.length >= 2
-      ? [
-          publishedNotices[currentIndex],
-          publishedNotices[(currentIndex + 1) % publishedNotices.length],
-        ]
-      : [publishedNotices[currentIndex]];
-
-  const renderNotice = (notice: Notice) => {
+  const renderNotice = (notice: Notice, idx?: number) => {
     const mediaUrl = mediaMap[notice._id] || notice.fileUrl;
     const isImage = notice?.file_type?.startsWith("image/");
     const isPdf = notice?.file_type === "application/pdf";
@@ -681,8 +152,8 @@ export function NoticeSlideshow({
 
     return (
       <div
-        key={notice._id}
-        className="flex-[1.2] flex flex-col min-w-0 bg-slate-900/95 border border-slate-700 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300"
+        key={`${notice._id}-${idx}`}
+        className="w-1/2 flex-shrink-0 flex flex-col min-w-0 bg-slate-900/95 border border-slate-700 rounded-xl overflow-hidden shadow-md hover:shadow-lg transition-all duration-300"
       >
         <div className="flex-1 relative overflow-hidden p-1">
           {isImage ? (
@@ -722,16 +193,12 @@ export function NoticeSlideshow({
     <div className="w-full h-full flex flex-col overflow-hidden">
       <div className="flex-1 relative overflow-hidden">
         <div
-          className={`w-full h-[calc(100%+25px)] flex gap-1 p-1 transition-opacity duration-300 ${
-            isTransitioning ? "opacity-0" : "opacity-100"
-          }`}
+          className="w-full h-[calc(100%+25px)] flex gap-1 p-1 transition-transform duration-700 ease-in-out"
+          style={{
+            transform: `translateX(-${currentIndex * (100 / noticesPerView)}%)`,
+          }}
         >
-          {currentNotices.map(renderNotice)}
-          {currentNotices.length === 1 && (
-            <div className="flex-1 flex items-center justify-center bg-slate-800 rounded-lg">
-              <p className="text-slate-500 text-sm">End of notices</p>
-            </div>
-          )}
+          {circularNotices.map((notice, idx) => renderNotice(notice, idx))}
         </div>
       </div>
     </div>

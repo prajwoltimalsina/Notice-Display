@@ -83,6 +83,60 @@ export const api = {
       setAuthToken(null);
     },
 
+    forgotPassword: async (email: string) => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/forgot-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to request password reset');
+        }
+        return response.json();
+      } catch (error) {
+        console.error('Forgot password error:', error);
+        throw error;
+      }
+    },
+
+    resetPassword: async (token: string, newPassword: string, confirmPassword: string) => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/reset-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, newPassword, confirmPassword }),
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to reset password');
+        }
+        return response.json();
+      } catch (error) {
+        console.error('Reset password error:', error);
+        throw error;
+      }
+    },
+
+    verifyResetToken: async (token: string) => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/auth/verify-reset-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token }),
+        });
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to verify token');
+        }
+        return response.json();
+      } catch (error) {
+        console.error('Verify token error:', error);
+        throw error;
+      }
+    },
+
     // Admin approval endpoints
     getPendingApprovals: async () => {
       const response = await fetch(`${API_BASE_URL}/api/auth/admin/pending-approvals`, {

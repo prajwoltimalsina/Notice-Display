@@ -134,3 +134,236 @@ exports.getProfile = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+// Request password reset
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Validate input
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (!user) {
+      // Don't reveal if email exists (security best practice)
+      return res.status(200).json({ 
+        message: 'If an account with that email exists, you will receive a password reset code.' 
+      });
+    }
+
+    // Generate reset code (6-digit numeric code for easy manual entry)
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const resetCodeHash = require('crypto')
+      .createHash('sha256')
+      .update(resetCode)
+      .digest('hex');
+
+    // Set reset code and expiry (1 hour)
+    user.resetPasswordToken = resetCodeHash;
+    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour from now
+
+    await user.save();
+
+    // Log the code for development debugging
+    console.log(`\n========== PASSWORD RESET CODE ==========`);
+    console.log(`Email: ${email}`);
+    console.log(`Reset Code: ${resetCode}`);
+    console.log(`Expires in: 1 hour`);
+    console.log(`==========================================\n`);
+
+    // Try to send email with reset code
+    try {
+      await sendResetCodeEmail(user.email, user.name || 'User', resetCode);
+      console.log(`Reset email sent to ${user.email}`);
+    } catch (emailError) {
+      console.warn(`Failed to send email: ${emailError.message}. Code available in console.`);
+      // Don't fail the request if email sending fails in development
+      if (process.env.NODE_ENV === 'production') {
+        throw emailError;
+      }
+    }
+
+    // In development, return the code for testing
+    const isDevelopment = process.env.NODE_ENV === 'development' || !process.env.NODE_ENV;
+
+    res.status(200).json({ 
+      message: 'If an account with that email exists, you will receive a password reset code.',
+      resetCode: isDevelopment ? resetCode : undefined,
+    });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Server error during password reset request' });
+  }
+};
+
+// Helper function to send reset code email
+async function sendResetCodeEmail(email, name, resetCode) {
+  const nodemailer = require('nodemailer');
+  
+  // Check if email credentials are configured
+  const emailUser = process.env.EMAIL_USER;
+  const emailPass = process.env.EMAIL_PASS;
+
+  if (!emailUser || !emailPass || emailUser === 'your-email@gmail.com' || emailPass === 'your-app-password-here') {
+    console.warn('\n⚠️  EMAIL NOT CONFIGURED');
+    console.warn('EMAIL_USER:', emailUser);
+    console.warn('EMAIL_PASS:', emailPass ? '[SET]' : '[NOT SET]');
+    console.warn('Please update .env file with actual Gmail credentials');
+    console.warn('See EMAIL_SETUP.md for instructions\n');
+    throw new Error('Email credentials not configured. Update .env file with EMAIL_USER and EMAIL_PASS');
+  }
+
+  const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: emailUser,
+      pass: emailPass,
+    },
+  });
+
+  const mailOptions = {
+    from: emailUser,
+    to: email,
+    subject: 'Password Reset Code - KU Notice Board',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #333;">Password Reset Request</h2>
+        <p>Hi ${name},</p>
+        <p>We received a request to reset your password. Use the code below to reset your password:</p>
+        
+        <div style="background-color: #f0f0f0; padding: 20px; text-align: center; border-radius: 5px; margin: 20px 0;">
+          <h3 style="color: #0066cc; letter-spacing: 5px; font-size: 24px; margin: 0;">
+            ${resetCode}
+          </h3>
+        </div>
+        
+        <p><strong>Important:</strong></p>
+        <ul>
+          <li>This code expires in 1 hour</li>
+          <li>If you didn't request this, please ignore this email</li>
+          <li>Never share this code with anyone</li>
+        </ul>
+        
+        <p>Go to your password reset page and enter this code along with your new password.</p>
+        
+        <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+        <p style="color: #666; font-size: 12px;">
+          This is an automated message from KU Notice Board. Please do not reply to this email.
+        </p>
+      </div>
+    `,
+  };
+
+  try {
+    console.log(`\n📧 Attempting to send reset code email to ${email}...`);
+    const result = await transporter.sendMail(mailOptions);
+    console.log(`✅ Reset email sent successfully!`);
+    console.log(`Message ID: ${result.messageId}\n`);
+    return result;
+  } catch (err) {
+    console.error('\n❌ EMAIL SENDING FAILED');
+    console.error('Error:', err.message);
+    console.error('Code:', err.code);
+    console.error('\nCommon causes:');
+    console.error('1. Incorrect EMAIL_USER or EMAIL_PASS in .env');
+    console.error('2. 2-Factor Authentication not enabled on Gmail account');
+    console.error('3. Using regular password instead of App Password');
+    console.error('4. Gmail blocking the connection (check Gmail security alerts)');
+    console.error('5. Less secure apps not enabled\n');
+    throw err;
+  }
+}
+
+// Verify password reset token
+exports.verifyResetToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: 'Token is required' });
+    }
+
+    // Hash the token to match with stored hash
+    const crypto = require('crypto');
+    const resetTokenHash = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    // Find user with valid reset token
+    const user = await User.findOne({
+      resetPasswordToken: resetTokenHash,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ 
+        message: 'Password reset token is invalid or has expired.' 
+      });
+    }
+
+    res.status(200).json({ 
+      message: 'Token is valid',
+      email: user.email,
+    });
+  } catch (error) {
+    console.error('Verify reset token error:', error);
+    res.status(500).json({ message: 'Server error during token verification' });
+  }
+};
+
+// Reset password with token
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword, confirmPassword } = req.body;
+
+    // Validate input
+    if (!token || !newPassword || !confirmPassword) {
+      return res.status(400).json({ message: 'Token and password are required' });
+    }
+
+    if (newPassword !== confirmPassword) {
+      return res.status(400).json({ message: 'Passwords do not match' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    // Hash the token to match with stored hash
+    const crypto = require('crypto');
+    const resetTokenHash = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    // Find user with valid reset token
+    const user = await User.findOne({
+      resetPasswordToken: resetTokenHash,
+      resetPasswordExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ 
+        message: 'Password reset token is invalid or has expired. Please request a new one.' 
+      });
+    }
+
+    // Update password
+    user.password = newPassword;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+
+    await user.save();
+
+    res.status(200).json({ 
+      message: 'Password reset successfully. You can now sign in with your new password.' 
+    });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Server error during password reset' });
+  }
+};

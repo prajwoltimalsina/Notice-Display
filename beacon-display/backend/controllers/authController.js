@@ -161,9 +161,9 @@ exports.forgotPassword = async (req, res) => {
       .update(resetCode)
       .digest('hex');
 
-    // Set reset code and expiry (1 hour)
+    // Set reset code and expiry (10 minutes)
     user.resetPasswordToken = resetCodeHash;
-    user.resetPasswordExpires = new Date(Date.now() + 3600000); // 1 hour from now
+    user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
     await user.save();
 
@@ -171,7 +171,7 @@ exports.forgotPassword = async (req, res) => {
     console.log(`\n========== PASSWORD RESET CODE ==========`);
     console.log(`Email: ${email}`);
     console.log(`Reset Code: ${resetCode}`);
-    console.log(`Expires in: 1 hour`);
+    console.log(`Expires in: 10 minutes`);
     console.log(`==========================================\n`);
 
     // Try to send email with reset code
@@ -201,32 +201,25 @@ exports.forgotPassword = async (req, res) => {
 
 // Helper function to send reset code email
 async function sendResetCodeEmail(email, name, resetCode) {
-  const nodemailer = require('nodemailer');
+  const sgMail = require('@sendgrid/mail');
   
-  // Check if email credentials are configured
-  const emailUser = process.env.EMAIL_USER;
-  const emailPass = process.env.EMAIL_PASS;
+  // Check if SendGrid credentials are configured
+  const apiKey = process.env.SENDGRID_API_KEY;
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL;
 
-  if (!emailUser || !emailPass || emailUser === 'your-email@gmail.com' || emailPass === 'your-app-password-here') {
-    console.warn('\n⚠️  EMAIL NOT CONFIGURED');
-    console.warn('EMAIL_USER:', emailUser);
-    console.warn('EMAIL_PASS:', emailPass ? '[SET]' : '[NOT SET]');
-    console.warn('Please update .env file with actual Gmail credentials');
-    console.warn('See EMAIL_SETUP.md for instructions\n');
-    throw new Error('Email credentials not configured. Update .env file with EMAIL_USER and EMAIL_PASS');
+  if (!apiKey || !fromEmail) {
+    console.warn('\n⚠️  SENDGRID NOT CONFIGURED');
+    console.warn('SENDGRID_API_KEY:', apiKey ? '[SET]' : '[NOT SET]');
+    console.warn('SENDGRID_FROM_EMAIL:', fromEmail ? '[SET]' : '[NOT SET]');
+    console.warn('Please update .env file with actual SendGrid credentials\n');
+    throw new Error('SendGrid credentials not configured. Update .env file with SENDGRID_API_KEY and SENDGRID_FROM_EMAIL');
   }
 
-  const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: emailUser,
-      pass: emailPass,
-    },
-  });
+  sgMail.setApiKey(apiKey);
 
-  const mailOptions = {
-    from: emailUser,
+  const msg = {
     to: email,
+    from: fromEmail,
     subject: 'Password Reset Code - KU Notice Board',
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -242,7 +235,7 @@ async function sendResetCodeEmail(email, name, resetCode) {
         
         <p><strong>Important:</strong></p>
         <ul>
-          <li>This code expires in 1 hour</li>
+          <li>This code expires in 10 minutes</li>
           <li>If you didn't request this, please ignore this email</li>
           <li>Never share this code with anyone</li>
         </ul>
@@ -258,21 +251,20 @@ async function sendResetCodeEmail(email, name, resetCode) {
   };
 
   try {
-    console.log(`\n📧 Attempting to send reset code email to ${email}...`);
-    const result = await transporter.sendMail(mailOptions);
+    console.log(`\n📧 Attempting to send reset code email to ${email} via SendGrid...`);
+    const result = await sgMail.send(msg);
     console.log(`✅ Reset email sent successfully!`);
-    console.log(`Message ID: ${result.messageId}\n`);
     return result;
   } catch (err) {
     console.error('\n❌ EMAIL SENDING FAILED');
     console.error('Error:', err.message);
-    console.error('Code:', err.code);
+    if (err.response) {
+      console.error(err.response.body);
+    }
     console.error('\nCommon causes:');
-    console.error('1. Incorrect EMAIL_USER or EMAIL_PASS in .env');
-    console.error('2. 2-Factor Authentication not enabled on Gmail account');
-    console.error('3. Using regular password instead of App Password');
-    console.error('4. Gmail blocking the connection (check Gmail security alerts)');
-    console.error('5. Less secure apps not enabled\n');
+    console.error('1. Incorrect SENDGRID_API_KEY or SENDGRID_FROM_EMAIL in .env');
+    console.error('2. Sender Identity not verified on SendGrid');
+    console.error('3. SendGrid account restricted or suspended\n');
     throw err;
   }
 }
